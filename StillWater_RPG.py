@@ -305,3 +305,118 @@ def create_character():
     slow_print(f"\n{player['name']} — {player['class']} joined the ranks.")
     player_art()
     short_pause(0.8)
+
+# -------------------------
+# XP & Leveling
+
+def gain_xp(amount):
+    player["xp"] += amount
+    slow_print(f"You gain {amount} XP!")
+    while player["xp"] >= player["level"] * 20:
+        player["xp"] -= player["level"] * 20
+        player["level"] += 1
+        player["max_hp"] += 10
+        player["attack"] += 2
+        player["defense"] += 1
+        # small random stat increases on level
+        stat_to_boost = random.choice(list(player["stats"].keys()))
+        player["stats"][stat_to_boost] += 1
+        player["hp"] = player["max_hp"]
+        slow_print(f"LEVEL UP! You are now level {player['level']}! (+1 {stat_to_boost})")
+        level_up_visual(player["level"])
+
+def level_up_visual(new_level):
+    divider()
+    print(rf"""
+     ↑ LEVEL {new_level} ↑
+      *   *   *   *   *
+     *  YOU FEEL STRONGER  *
+      *   *   *   *   *
+    """)
+    time.sleep(1)
+    divider()
+
+# -------------------------
+# Exploration & Events
+
+def explore_camp():
+    divider()
+    slow_print("You wander through the camp grounds...")
+    show_camp_map()
+    print("\nWhere do you want to go?")
+    keys = list(camp_locations.keys())
+    for i, k in enumerate(keys, 1):
+        print(f"{i}. {k}")
+    print(f"{len(keys)+1}. Return to Main Camp")
+    choice = input("Choose location: ").strip()
+    if not choice.isdigit():
+        slow_print("You linger oddly and a guard barks. You step back.")
+        return
+    choice = int(choice)
+    if 1 <= choice <= len(keys):
+        loc = keys[choice-1]
+        slow_print(f"\nYou head to the {loc}...")
+        for npc in camp_locations[loc]:
+            if npc in npcs:
+                dialogue = random.choice(npcs[npc]["dialogue"])
+                slow_print(f"{npc}: \"{dialogue}\"", 0.02)
+                # recruitment chance for recruitable NPCs (only Jori here)
+                if npcs[npc].get("recruitable", False) and not npcs[npc]["recruited"]:
+                    recruit = input(f"Do you attempt to recruit {npc}? (y/n): ").strip().lower()
+                    if recruit == "y":
+                        if random.random() < 0.9:  # high chance
+                            npcs[npc]["recruited"] = True
+                            player["party"].append(npc)
+                            slow_print(f"{npc} has joined your party!")
+                        else:
+                            slow_print(f"{npc} refuses and walks away.")
+        # small random events
+        if loc == "Work Area" and random.random() < 0.25:
+            slow_print("A cart collapses — you help salvage tools and find a crude shard (+1 XP).")
+            gain_xp(1)
+        if loc == "Chapel" and random.random() < 0.15:
+            slow_print("A hush, a scrap of hymn. Your will steadies (+1 willpower).")
+            player["stats"]["willpower"] += 1
+    else:
+        slow_print("You return to your fire, plotting escape.")
+
+# -------------------------
+# Training & Simple Activities
+
+def training_session():
+    divider()
+    slow_print("You spend an hour training in the yard.")
+    rolls = {
+        "strength": (1,3),
+        "agility": (1,3),
+        "intelligence": (0,2),
+        "endurance": (1,3),
+        "willpower": (0,2),
+        "luck": (0,1)
+    }
+    stat = random.choice(list(rolls.keys()))
+    gain = random.randint(*rolls[stat])
+    if gain > 0:
+        player["stats"][stat] += gain
+        slow_print(f"Your {stat} increases by {gain}!")
+    else:
+        slow_print("The training was dull and taught little.")
+    xp_gain = random.randint(2,6)
+    gain_xp(xp_gain)
+    slow_print(f"(+{xp_gain} XP)")
+
+# -------------------------
+# Enemy stat generator
+
+def generate_enemy(enemy_template, level):
+    # Return dictionary with hp and stats for combat math
+    base_hp = enemy_template.get("hp_base", 20) + level * 5
+    stats = {
+        "strength": max(1, int(level * 1.5)),
+        "agility": max(1, int(level * 0.9)),
+        "endurance": max(1, int(level * 1.0)),
+        "willpower": max(0, int(level * 0.4)),
+        "luck": max(0, int(level * 0.3))
+    }
+    return {"name": enemy_template["name"], "level": level, "hp": base_hp, "max_hp": base_hp, "stats": stats}
+
