@@ -1,5 +1,7 @@
 """
-StillWater RPG
+StillWater RPG — Full StillWater Version (Option B) — Stat-based Combat v2
+- Stats now meaningfully affect combat:
+
 """
 
 import random
@@ -220,3 +222,86 @@ player = {
     "party":[],
     "boss_defeated":False
 }
+
+# -------------------------
+# Combat math: make stats matter
+
+def calculate_damage(attacker_stats, defender_stats, base, damage_type="physical"):
+    """
+    Returns (damage_int, crit_bool)
+    - damage_type: 'physical' uses strength, 'special' uses willpower
+    - crit chance derived from attacker's luck: each point = 0.5% crit chance
+    - dodge chance derived from defender agility: each point = 0.5% dodge chance
+    - endurance reduces damage (each point ~0.9)
+    """
+    # Crit check
+    crit_chance = attacker_stats.get("luck", 0) * 0.005  # e.g., luck 10 -> 0.05 = 5%
+    crit = random.random() < crit_chance
+
+    # Dodge check (defender agility)
+    dodge_chance = defender_stats.get("agility", 0) * 0.005
+    dodged = random.random() < dodge_chance
+    if dodged:
+        return 0, False, True  # damage 0, not crit, dodged
+
+    # Base scaling
+    if damage_type == "physical":
+        scaled = base + attacker_stats.get("strength", 0) * 1.2
+    elif damage_type == "special":
+        scaled = base + attacker_stats.get("willpower", 0) * 1.6
+    else:
+        scaled = base + attacker_stats.get("strength", 0)
+
+    # Defense/endurance reduction
+    reduction = defender_stats.get("endurance", 0) * 0.9
+    damage = max(1, int(scaled - reduction))
+
+    if crit:
+        damage = int(damage * 1.5)
+
+    return damage, crit, False
+
+# -------------------------
+# Classes & Character Creation
+
+def create_character():
+    clear_screen()
+    slow_print("Welcome to STILLWATER — the camp where freedom is a memory.")
+    name = input("Enter your character's name (default: Vera): ").strip()
+    player["name"] = name or "Vera"
+    slow_print(f"Welcome, {player['name']}.\n")
+
+    # Class selection
+    slow_print("Choose your class:")
+    for idx, cls in enumerate(classes.keys(), 1):
+        abilities = ", ".join(classes[cls]["abilities"])
+        print(f"{idx}. {cls} — Abilities: {abilities}")
+    while True:
+        choice = input("Enter class number: ").strip()
+        if choice.isdigit() and 1 <= int(choice) <= len(classes):
+            idx = int(choice)-1
+            cls_name = list(classes.keys())[idx]
+            player["class"] = cls_name
+            break
+        print("Invalid choice.")
+    # assign stats from class
+    c = classes[player["class"]]
+    player["max_hp"] = c["hp"]
+    player["hp"] = player["max_hp"]
+    player["attack"] = c["attack"]
+    player["defense"] = c["defense"]
+    player["abilities"] = c["abilities"].copy()
+    # give small per-class stat flavor (optional)
+    if "Warrior" in player["class"] or "Labored" in player["class"]:
+        player["stats"]["strength"] += 2
+        player["stats"]["endurance"] += 1
+    elif "Divine" in player["class"] or "Mirror" in player["class"]:
+        player["stats"]["intelligence"] += 2
+        player["stats"]["willpower"] += 1
+    elif "Jori" in player["class"]:
+        player["stats"]["agility"] += 2
+        player["stats"]["luck"] += 1
+
+    slow_print(f"\n{player['name']} — {player['class']} joined the ranks.")
+    player_art()
+    short_pause(0.8)
